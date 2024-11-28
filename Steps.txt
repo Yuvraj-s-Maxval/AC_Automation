@@ -1,0 +1,44 @@
+Automation steps
+
+- Go to task and look for filters and look for all open for the Special - TaskStatus and owner, tasktype :  then no litigation and then today in respond by (Weekend + holiday get combined with today)
+- Matter, Matter title, Tasktype, Ownwer and commments (Formatting)
+    - Patents : Exclude title
+    - Trademarks : All
+-  Matter type, Deadline Type
+- Csv file pulled and then conversion to excel
+
+
+Filtering process
+
+- Deadline :
+    - Remove the internal deadline
+
+- Matter type
+    - If
+    -  Owner : Britany Steele 
+    - FTO in Matter or Title
+    Not to be sent
+
+    - TRADEMARK
+        - Trademark Opposition and also make sure if task type is review then not to be sent
+
+ - Task type
+    - Keyword based filtering review
+
+ - Owner :
+    - Faisal Khan
+
+After filtering matter,tasktype,owner and comments
+
+- BIFURCATION
+
+- Patents
+- Urgent but not hard deadlines
+- Trademarks
+
+
+DOUBTS
+- Matter title is Null value (What to do with that)
+- About trademark opposition thing
+- After filtering review keyword where to put that data (In trademark ?)
+- Whatever removal is being done where to put them
