@@ -1,12 +1,15 @@
 import logging
 import os
+import time
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support import expected_conditions as EC
+from tkinter import Tk, filedialog  # Import tkinter for file dialog
 
 # Create the logs directory if it doesn't exist
 log_dir = "logs"
@@ -27,12 +30,20 @@ logging.basicConfig(
 )
 
 class AppCollAutomation:
-    def __init__(self, driver_path):
+    def __init__(self, driver_path, download_directory):
         logging.info("Initializing AppCollAutomation.")
         self.root_url = "https://login.appcoll.com/"
+        
+        # Set Chrome options to specify download folder
         self.chrome_options = Options()
-        # self.chrome_options.add_argument("--headless")  # Uncomment to run in headless mode
         self.chrome_options.add_argument("--start-maximized")  # Maximize the window on startup
+        self.chrome_options.add_experimental_option("prefs", {
+            "download.default_directory": download_directory,  # Set custom download path
+            "download.prompt_for_download": False,  # Don't prompt for download location
+            "directory_upgrade": True,  # Allows overwriting files in the download directory
+            "safebrowsing.enabled": True  # Disable the safe browsing feature to prevent blocking downloads
+        })
+        
         self.service = Service(driver_path)  # Driver path is passed as an argument
         self.driver = None
 
@@ -92,14 +103,70 @@ class AppCollAutomation:
             # If the button is found, log and print a message
             if columns_button:
                 logging.info("Columns button found.")
-                print("Columns button found.")
                 columns_button.click()  # Click the button if it's found
+
+                # Checking the selected columns
+                required_columns = ['TaskStatus', 'Matter', 'Matter.Title', 'TaskType', 'DeadlineType', 'Owner', 'Comments']
+                select_element = self.driver.find_element(By.XPATH, "//select[@id='ctl00_SelectedColumnsList']")
+                select = Select(select_element)
+                all_required_columns_exist = all(option.text in required_columns for option in select.options)
+                if all_required_columns_exist:
+                    logging.info("All required columns exist in the selected columns.")
+                    WebDriverWait(self.driver, 30).until(
+                        EC.element_to_be_clickable((By.XPATH, '//input[@id="ctl00_ChooseColumnsOk"]'))).click()
+                    logging.info("Required columns selected")
+
+                    # Exporting the file as CSV file
+                    logging.info("Exporting the CSV file.")
+                    WebDriverWait(self.driver, 30).until(
+                        EC.element_to_be_clickable((By.XPATH, '//input[@title="Export information to CSV file"]'))).click()
+                    WebDriverWait(self.driver, 30).until(
+                        EC.element_to_be_clickable((By.XPATH, '//input[@value="Export"]'))).click()
+                    
+                    logging.info("Export triggered, waiting for file download...")
+                    
+                    # Here, we invoke a temporary UI for file selection after export
+                    self.prompt_for_file_input()
+
+                else:
+                    logging.error("Not all required columns exist in the selected columns.")
+                time.sleep(10)
             else:
                 logging.error("Columns button not found.")
 
         except Exception as e:
             logging.error(f"An error occurred during the process: {e}")
             raise
+
+    def prompt_for_file_input(self):
+        """ Use tkinter to create a temporary UI to prompt the user to select the downloaded file. """
+        logging.info("Opening file dialog for user to select the downloaded CSV file.")
+        
+        # Creating a tkinter root window (hidden, since we just want the file dialog)
+        root = Tk()
+        root.withdraw()  # Hide the root window
+
+        # Open file dialog
+        file_path = filedialog.askopenfilename(
+            title="Select the downloaded CSV file", 
+            filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
+        )
+        
+        if file_path:
+            logging.info(f"File selected: {file_path}")
+            # Continue with the process using the selected file
+            self.process_downloaded_file(file_path)
+        else:
+            logging.warning("No file selected. Proceeding without file.")
+        
+        root.quit()  # Close the tkinter window
+
+    def process_downloaded_file(self, file_path):
+        """ Continue with processing the downloaded file (e.g., reading, analyzing, etc.) """
+        logging.info(f"Processing the file at {file_path}...")
+        # Add your file processing logic here (e.g., reading CSV, parsing data, etc.)
+        time.sleep(3)  # Simulating file processing time
+        logging.info(f"File {file_path} processed successfully.")
 
     def close_browser(self):
         logging.info("Closing the browser.")
@@ -110,7 +177,8 @@ class AppCollAutomation:
 # Example usage
 if __name__ == "__main__":
     driver_path = "Drivers/chromedriver.exe"
-    automation = AppCollAutomation(driver_path)
+    download_directory = "path/to/your/download/folder"  # Adjust this path
+    automation = AppCollAutomation(driver_path, download_directory)
 
     try:
         automation.start_browser()  # Start the browser
