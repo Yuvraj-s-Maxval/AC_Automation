@@ -1,7 +1,7 @@
 Automation steps
 
 - Go to task and look for filters and look for all open for the Special - TaskStatus and owner, tasktype :  then no litigation and then today in respond by (Weekend + holiday get combined with today)
-- Matter, Matter title, Tasktype, Ownwer and commments (Formatting)
+- Matter, Matter title,Matter.Type, Tasktype, Ownwer and commments (Formatting)
     - Patents : Exclude title
     - Trademarks : All
 -  Matter type, Deadline Type
@@ -15,18 +15,12 @@ Filtering process
 
 - Matter type
     - If
-    -  Owner : Britany Steele 
-    - FTO in Matter or Title
-    Not to be sent
+        - Owner : Britany Steele or Faisal Khan 
+        - FTO in Matter or Title
+        - Review in task type
+        - Trademark: Opposition in Matter Type
+    Then remove such rows
 
-    - TRADEMARK
-        - Trademark Opposition and also make sure if task type is review then not to be sent
-
- - Task type
-    - Keyword based filtering review
-
- - Owner :
-    - Faisal Khan
 
 After filtering matter,tasktype,owner and comments
 
