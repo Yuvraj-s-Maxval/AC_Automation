@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
 from tkinter import Tk, filedialog  # Import tkinter for file dialog
 
 # Create the logs directory if it doesn't exist
@@ -28,6 +29,7 @@ logging.basicConfig(
         logging.StreamHandler()        # Log to the console
     ]
 )
+
 
 class AppCollAutomation:
     def __init__(self, driver_path, download_directory):
@@ -55,6 +57,68 @@ class AppCollAutomation:
         except Exception as e:
             logging.error(f"Error starting browser: {e}")
             raise
+
+    # Retry mechanism for clicking the AddColumn button
+    def click_add_column(self):
+        try:
+            add_button = WebDriverWait(self.driver, 30).until(
+                EC.element_to_be_clickable((By.XPATH, "//img[@onclick='AddColumn();']"))
+            )
+            add_button.click()
+            logging.info("Column added successfully.")
+        except StaleElementReferenceException as e:
+            logging.warning("StaleElementReferenceException occurred. Retrying...")
+            time.sleep(2)  # Optional: wait for a short period before retrying
+            self.click_add_column()  # Retry the click operation
+
+
+    def data_filtering(self,df):
+        """
+        This function filters the input DataFrame based on specific conditions and returns two DataFrames: one for patent-related data and another for trademark-related data.
+
+        Parameters:
+        - df (DataFrame): The input DataFrame to be filtered.
+
+        Returns:
+        - patent_df (DataFrame): A DataFrame containing patent-related data after filtering.
+        - trademark_df (DataFrame): A DataFrame containing trademark-related data after filtering.
+
+        The filtering process involves the following steps:
+        1. Remove rows where 'DeadlineType' is 'Internal Deadline'.
+        2. Iterate over each row to check for specific conditions in 'Owner', 'Matter.Title', 'Matter.Type', and 'TaskType' columns.
+        3. If any of the conditions are met, the index of that row is added to a list of indexes to be filtered.
+        4. Drop rows based on the list of indexes.
+        5. Create a patent_df by dropping 'Matter.Title' column from the filtered DataFrame.
+        6. Create a trademark_df as a copy of the filtered DataFrame.
+        """
+        # Removing the internal deadlines
+        df = df[df['DeadlineType'] != 'Internal Deadline']
+        df = df.reset_index(drop=True)
+
+        indexes_filtered = []
+
+        # Iterating over the Owner column to look for Brittany Steele
+        for i in range(len(df)):
+
+            # Extracting the owner and the Matter title
+            owner = df.at[i,'Owner']
+            matter_title = df.at[i,'Matter.Title']
+            matter_type = df.at[i, 'Matter.Type']
+            task_type = df.at[i,'TaskType']
+            
+            if owner == 'Brittany Steele' or owner == 'Faisal Khan' or 'FTO' in matter_title or 'review' in task_type.lower() or 'trademark: opposition' in matter_type.lower():
+                
+                # Adding the index
+                indexes_filtered.append(i)
+
+        df = df.drop(indexes_filtered)
+        df.reset_index(drop=True)
+        
+        patent_df = df.drop(['Matter.Title'],axis=1)
+        trademark_df = df.copy()
+        patent_df.to_csv("data/patent_data.csv")
+        trademark_df.to_csv("data/trademark_data.csv")
+        logging.info("Csv files processed succesfully")
 
     def perform_actions(self, login_id, login_pass):
         try:
@@ -99,17 +163,65 @@ class AppCollAutomation:
             columns_button = WebDriverWait(self.driver, 30).until(
                 EC.element_to_be_clickable((By.XPATH, '//a[@id="ctl00_ChooseColumnsButton"]'))
             )
-
-            # If the button is found, log and print a message
+            
+            # Check if the "Columns" button exists
             if columns_button:
                 logging.info("Columns button found.")
                 columns_button.click()  # Click the button if it's found
 
-                # Checking the selected columns
-                required_columns = ['TaskStatus', 'Matter', 'Matter.Title', 'TaskType', 'DeadlineType', 'Owner', 'Comments']
-                select_element = self.driver.find_element(By.XPATH, "//select[@id='ctl00_SelectedColumnsList']")
-                select = Select(select_element)
-                all_required_columns_exist = all(option.text in required_columns for option in select.options)
+                # List of required columns
+                required_columns = [
+                    'TaskStatus', 'Matter', 'Matter.Title', 'Matter.Type',
+                    'TaskType', 'DeadlineType', 'Owner', 'Comments'
+                ]
+
+                # Loop until all required columns are processed
+                while required_columns:
+                    # Locate the dropdown again to get updated options
+                    all_columns = self.driver.find_element(By.XPATH, "//select[@id='ctl00_UnselectedColumnsList']")
+                    all_columns_select = Select(all_columns)
+
+                    # Track whether a column was added in this iteration
+                    column_added = False
+
+                    # Iterate through each option in the dropdown
+                    for option in all_columns_select.options:
+                        if option.text in required_columns:
+                            logging.info(f"Found matching column: {option.text}")
+                            print(f"Found matching column: {option.text}")
+
+                            # Select the matching column
+                            all_columns_select.select_by_visible_text(option.text)
+
+                            # # Wait for and click the "AddColumn" button, with retry logic
+                            # self.click_add_column()
+
+                            # Remove the column from the required list
+                            required_columns.remove(option.text)
+
+                            # Log the action
+                            logging.info(f"{option.text} column added")
+                            print(f"{option.text} column added")
+
+                            # Indicate a column was added and break to re-fetch the dropdown
+                            column_added = True
+                            break
+
+                    # If no column was added in this iteration, break the loop
+                    if not column_added:
+                        logging.info("No matching columns found in the dropdown.")
+                        print("No matching columns found in the dropdown.")
+                        break
+
+                    
+                required_columns = [
+                    'TaskStatus', 'Matter', 'Matter.Title', 'Matter.Type',
+                    'TaskType', 'DeadlineType', 'Owner', 'Comments'
+                ]
+                
+                selected_columns_element = self.driver.find_element(By.XPATH, "//select[@id='ctl00_SelectedColumnsList']")
+                selected_columns_select = Select(selected_columns_element)
+                all_required_columns_exist = all(option.text in required_columns for option in selected_columns_select.options)
                 if all_required_columns_exist:
                     logging.info("All required columns exist in the selected columns.")
                     WebDriverWait(self.driver, 30).until(
